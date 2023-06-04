@@ -1,8 +1,7 @@
 from random import random as rand
 from vpython import *
-from math import isclose as isclose, atan
+from math import isclose, atan
 
-# class*
 class Boid:
    RADIUS = 1
    # raggio in cui si percepiscono i vicini, per coesione e allineamento
