@@ -1,8 +1,7 @@
 from random import random as rand
 from vpython import *
-from math import isclose as isclose, atan
+from math import isclose, atan
 
-# class*
 class Boid:
    RADIUS = 1
    # raggio in cui si percepiscono i vicini, per coesione e allineamento
@@ -11,12 +10,15 @@ class Boid:
    SEPARATION_RADIUS = 10
    MAX_SPEED = 0.5
    MAX_FORCE_MAGNITUDE = 0.01
+   # massima forza applicabile per scansare i vicini 
+   MAX_FORCE_MAGNITUDE_CLOSE = 0.015
    FORCE_TOCENTER_FACTOR = 25.0
    NULL_VECTOR = vector(0, 0, 0)
 
+   # la texture della sfera aiuta a visualizzare meglio la sfera
    def __init__(self, position: vector, velocity: vector):
-      self.acceleration = vector(0, 0, 0)
-      self.shape = sphere(pos = position, radius = Boid.RADIUS, velocity = velocity)
+      self.acceleration = Boid.NULL_VECTOR
+      self.shape = sphere(pos = position, radius = Boid.RADIUS, velocity = velocity, texture = textures.wood)
       self.neigh = []
       self.closeNeigh = []
 
@@ -24,8 +26,9 @@ class Boid:
       self.acceleration += force
 
    def resetForce(self):
-      self.acceleration = vector(0, 0, 0)
+      self.acceleration = Boid.NULL_VECTOR
 
+   # per ogni frame vengono eseguite queste azioni sul boide
    def frame(self, boids: list):
       self.shape.pos += self.shape.velocity
       self.shape.velocity += self.acceleration
@@ -49,6 +52,7 @@ class Boid:
 
       return force
 
+   # forza verso la direzione media dei vicini
    def forceAlignment(self) -> vector:
       if len(self.neigh) == 0:
          return Boid.NULL_VECTOR
@@ -63,33 +67,32 @@ class Boid:
 
       return force
 
+   # forza di repulsione dai vicini, pesata per distanza
    def forceSeparation(self) -> vector:
       sum = Boid.NULL_VECTOR
-      count = 0
+      lenNeigh = len(self.closeNeigh)
 
-      # ad ogni boide troppo vicino associa una forza repulsiva
-      # pesata sulla distanza
-      for (neigh, euc_dis) in self.closeNeigh:
-         sum += (self.shape.pos - neigh.shape.pos).norm() / euc_dis
-         count += 1
-
-      if count == 0:
+      if lenNeigh == 0:
          return Boid.NULL_VECTOR
 
+      for (neigh, euc_dis) in self.closeNeigh:
+         sum += (self.shape.pos - neigh.shape.pos).norm() / euc_dis
+
       # media le forze repulsive
-      force = sum / count  
+      force = sum / lenNeigh  
 
       # limite alla forza, come al solito tiene conto 
       # della forza preesistente
       if not isclose(force.mag, 0):
          force = force.norm() * (Boid.MAX_SPEED)
-         force -= self.shape.velocity # ??????????????????????????????????????????????????????????????
+         force -= self.shape.velocity # tiene conto anche della velocità a cui si avvicina l'altro
 
-         if force.mag > Boid.MAX_FORCE_MAGNITUDE:
-            force = force.norm() * (Boid.MAX_FORCE_MAGNITUDE)
+         if force.mag > Boid.MAX_FORCE_MAGNITUDE_CLOSE:
+            force = force.norm() * (Boid.MAX_FORCE_MAGNITUDE_CLOSE)
 
       return force
 
+   #forza verso l'origine, sennò i boidi escono dalla camera
    def forceToCenter(self) -> vector:
       centerDistance = (self.shape.pos - Boid.NULL_VECTOR).mag
       factor = 1.0 / pi * atan((centerDistance - Boid.FORCE_TOCENTER_FACTOR) / 4.0) + 0.5
@@ -103,6 +106,8 @@ class Boid:
       return force
 
    def updateNeigh(self, boids):
+      self.neigh = []
+      self.closeNeigh = []
       for boid in boids:
          # distanza calcolata dal centro delle sfere
          euc_dis = (self.shape.pos - boid.shape.pos).mag 
